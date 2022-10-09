@@ -1,4 +1,4 @@
-import ScalaWordCount.Config.{IN_PATH_PARAM, IN_PATH_DEFAULT, OUT_PATH_PARAM, OUT_PATH_DEFAULT}
+import ScalaWordCount.Config.{IN_PATH_DEFAULT, IN_PATH_PARAM, OUT_PATH_DEFAULT, OUT_PATH_PARAM}
 import org.apache.hadoop.conf.{Configuration, Configured}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.{IntWritable, Text}
@@ -8,17 +8,21 @@ import org.apache.hadoop.mapreduce.{Job, Mapper, Reducer}
 import org.apache.hadoop.util.{Tool, ToolRunner}
 
 import java.lang
+import java.util.Locale
 import scala.jdk.CollectionConverters.IterableHasAsScala
 
 class MapperWordCount extends Mapper[AnyRef, Text, Text, IntWritable] {
   val keyWord = new Text
   val one = new IntWritable(1)
 
-  override def map(key: scala.AnyRef, value: Text, context: Mapper[AnyRef, Text, Text, IntWritable]#Context): Unit =
+  override def map(key: AnyRef, value: Text,
+                   context: Mapper[AnyRef, Text, Text, IntWritable]#Context): Unit =
     value.toString
       .split("\\s")
-      .map(str => str.replaceAll("[.,;:\"()!?-]", ""))
-      .map(str => str.toLowerCase)
+      .map(str => str.trim)
+      .map(word => word.replaceAll("[.,;:\"()!?-]", ""))
+      .filter(str => str.nonEmpty)
+      .map(word => word.toLowerCase(Locale.ENGLISH))
       .foreach(word => {
         keyWord.set(word)
         context.write(keyWord, one)
@@ -44,8 +48,8 @@ object ScalaWordCount extends Configured with Tool {
   override def run(args: Array[String]): Int = {
     val job: Job = Job.getInstance(getConf, "Scala word count")
     job.setJarByClass(getClass)
-    job.setOutputKeyClass(classOf[IntWritable])
-    job.setOutputValueClass(classOf[Text])
+    job.setOutputKeyClass(classOf[Text])
+    job.setOutputValueClass(classOf[IntWritable])
     job.setMapperClass(classOf[MapperWordCount])
     job.setReducerClass(classOf[ReducerWordCount])
     job.setNumReduceTasks(1)
